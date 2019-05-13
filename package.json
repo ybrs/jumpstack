@@ -2,6 +2,7 @@
   "name": "jumpstack",
   "version": "0.0.1",
   "description": "Minimalistic callback style helpers like chain, parallel, parallelMap etc.",
+  "homepage": "https://github.com/ybrs/jumpstack",
   "engines": {
     "node": ">= 8.0"
   },

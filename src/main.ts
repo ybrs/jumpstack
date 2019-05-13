@@ -78,6 +78,13 @@ class Context {
         return this.data[k];
     }
 
+    /**
+     * you can break the chain with value
+     * it will skip the remaining steps
+     *
+     * @param value
+     * @param cb
+     */
     break(value, cb?) {
         this.broken = true;
         this.breakValue = value;
@@ -104,6 +111,8 @@ class Chain {
     reject = null;
     last: any;
     context: Context;
+    maxTimeout = null;
+    timeout = null;
 
     constructor(fns, resolve, reject) {
         this.fns = fns;
@@ -113,9 +122,19 @@ class Chain {
         this.reject = reject;
         this.last = null;
         this.context = new Context();
+        this.timeout = null;
     }
 
+    setMaxTimeout = (ms) => {
+        this.maxTimeout = ms;
+        return this;
+    }
+
+
     breakChain = (value) => {
+        if (this.timeout)
+            clearTimeout(this.timeout);
+
         return this.resolve(value);
     }
 
@@ -124,6 +143,10 @@ class Chain {
     }
 
     callback = (err, result) => {
+        if (this.timeout){
+            clearTimeout(this.timeout);
+        }
+
         if (err) {
             return this.reject(err);
         }
@@ -150,6 +173,12 @@ class Chain {
     }
 
     runNext = (result) => {
+        if (this.maxTimeout){
+            this.timeout = setTimeout(()=>{
+                throw new Error(`timeout in chain step - ${this.waitCnt} ${this.fns[this.waitCnt]}`);
+            }, this.maxTimeout)
+
+        }
         this.fns[this.waitCnt](this.callback, result, this.context);
     }
 
@@ -189,6 +218,11 @@ export const chain = (fns, cb?: CallbackFunction) => {
     }
 
     return promiseChain(fns);
+};
+
+export const chainWithTimeout = (fns, maxTimeout, cb:CallbackFunction) => {
+    const chain = new Chain(fns, val => cb(null, val), err => cb(err, null));
+    chain.setMaxTimeout(maxTimeout).runNext(null);
 };
 
 export const promiseChain = (fns) => {
@@ -256,8 +290,11 @@ export const ifValue = fn => (cb, val, ctx) => {
 * runs a function for each of your elements then
 * calls your callback function with all collected values
 *
+* with parallelMap there is no order of the values. We DON'T keep
+* the order of the callbacks. Normally you'd just use mapChain
+*
 * example:
-*     mapChain(values, (value, cb)=>{
+*     parallelMap(values, (value, cb)=>{
 *        cb(null, value)
 *     }, (errors, values)=>{
 *
